@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-const LOCAL_IP ="10.70.148.46"; // ✅ your PC IPv4
+const LOCAL_IP = "10.70.148.46"; // your PC IP
 
 const ENV = {
   development: {
@@ -21,9 +21,10 @@ const ENV = {
   },
 
   production: {
-    apiUrl: "https://api.vybe.c.com/api", // future
-    baseUrl: "https://api.vybe.c.com",
-    socketUrl: "https://api.vybe.c.com",
+    // ✅ CURRENT LIVE BACKEND
+    apiUrl: "https://vybe-c.onrender.com/api",
+    baseUrl: "https://vybe-c.onrender.com",
+    socketUrl: "https://vybe-c.onrender.com",
   },
 };
 
