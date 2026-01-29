@@ -12,6 +12,7 @@ const chatRoutes = require("./routes/chat.routes");
 const adminRoutes = require("./routes/admin.routes");
 const cleanupExpiredPosts = require("./utils/cleanupExpiredPosts");
 const searchRoutes = require("./routes/search.routes");
+const hashtagRoutes = require("./routes/hashtag.routes");
 
 // ✅ CREATE APP FIRST
 const app = express();
@@ -19,7 +20,6 @@ const app = express();
 // ✅ MIDDLEWARE
 app.use(cors());
 app.use(express.json());
-app.use("/uploads", express.static("uploads"));
 
 // ✅ ROUTES
 app.use("/api/auth", authRoutes);
@@ -29,9 +29,14 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin", require("./routes/admin.routes"));
 app.use("/api/search", searchRoutes);
+app.use("/api/hashtags", require("./routes/hashtag.routes"));
+
+
 
 // ✅ CREATE HTTP SERVER FROM APP
 const server = http.createServer(app);
+
+
 
 // ✅ ATTACH SOCKET.IO TO SERVER
 const io = new Server(server, {
@@ -40,16 +45,11 @@ const io = new Server(server, {
   },
 });
 
+app.set("io",io);
+
 // ✅ SOCKET CONNECTION
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
-
-  socket.on("sendMessage", (data) => {
-    const { roomId, message } = data;
-
-    // send only to users in the same room
-    io.to(roomId).emit("receiveMessage", message);
-  });
 
   socket.on("sendMessage", (data) => {
     const { roomId, message } = data;

@@ -20,20 +20,24 @@ const {
    LOGGED-IN USER PROFILE
 ========================= */
 // This handles the "me" route specifically
-router.get("/me", auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id)
-      .select("-password")
-      .populate("followers following"); // Combined logic from both your /me blocks
+// router.get("/me", auth,  async (req, res) => {
+//   try {
+//     const user = await User.findById(req.user.id)
+//       .select("-password")
+//       .populate("followers following"); // Combined logic from both your /me blocks
 
-    const posts = await Post.find({ user: req.user.id }).sort({ createdAt: -1 });
+//       console.log("🔥 USER SENT TO FRONTEND:", user._id);
 
-    res.json({ user, posts });
-  } catch (err) {
-    console.error("ME ERROR:", err.message);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+//     const posts = await Post.find({ user: req.user.id }).sort({ createdAt: -1 });
+
+//     res.json({ user, posts });
+//   } catch (err) {
+//     console.error("ME ERROR:", err.message);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+router.get("/me", auth, getMyProfile);
 
 /* =========================
    OTHER USER PROFILE

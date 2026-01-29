@@ -13,6 +13,14 @@ const initSocket = (httpServer) => {
   io.on("connection", (socket) => {
     console.log("🟢 New socket connected:", socket.id);
 
+    socket.on("typing", ({ roomId, userId }) => {
+      socket.to(roomId).emit("userTyping", { userId });
+    });
+
+    socket.on("stopTyping", ({ roomId, userId }) => {
+      socket.to(roomId).emit("userStopTyping", { userId });
+    });
+
     // Join chat room
     socket.on("joinRoom", (roomId) => {
       socket.join(roomId);
@@ -29,6 +37,20 @@ const initSocket = (httpServer) => {
     socket.on("disconnect", () => {
       console.log("🔴 Socket disconnected:", socket.id);
     });
+
+    socket.on("joinGroup", (roomId) => {
+  socket.join(roomId);
+});
+
+socket.on("sendGroupMessage", ({ roomId, message }) => {
+  socket.to(roomId).emit("receiveMessage", message);
+});
+
+socket.on("post:unsave", ({ postId }) => {
+  io.emit("post:unsave:update", { postId });
+});
+
+
   });
 };
 

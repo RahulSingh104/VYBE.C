@@ -1,8 +1,9 @@
 const Post = require("../models/Post");
 const { checkContent } = require("../utils/aiModeration");
-const User = require("../models/User"); 
-
-
+const User = require("../models/User");
+const { getCache, setCache } = require("../utils/cache");
+const Hashtag = require("../models/Hashtag");
+const cloudinary = require("../utils/cloudinary");
 
 exports.createPost = async (req, res) => {
   try {
@@ -14,37 +15,98 @@ exports.createPost = async (req, res) => {
 
     const isTemporary = req.body.isTemporary === "true";
 
+    const isDiscussion = req.body.isDiscussion === "true"; // ✅ NEW
+    const mood = req.body.mood || "happy"; // ✅ NEW
+    const tags = req.body.tags
+      ? req.body.tags.split(",").map((t) => t.trim().toLowerCase())
+      : [];
+
+    // 🔍 Extract hashtags from caption
+    const captionTags =
+      req.body.caption
+        ?.match(/#\w+/g)
+        ?.map((t) => t.replace("#", "").toLowerCase()) || [];
+
+    // 🔥 Merge UI tags + caption tags (unique)
+    const finalTags = [...new Set([...tags, ...captionTags])];
+
+    // postData.tags = finalTags;
+
     const postData = {
       user: req.user.id,
-      caption: req.body.caption,
-      isTemporary,
+      createdBy: req.user.id,
+      caption: req.body.caption || "",
+      isTemporary: req.body.isTemporary === "true",
+      isDiscussion: req.body.isDiscussion === "true", // ✅ NEW
+      isAnonymous: req.body.isAnonymous === "true", // ✅ new
+      tags: finalTags, // ✅ array of tags
+      mood: req.body.mood || "happy", // ✅ NEW
     };
 
-    if (req.file) {
-  postData.image = req.file.filename;   // ✅ SINGLE IMAGE
+  //   if (req.file) {
+  //      postData.image = {
+  //   url: req.file.path,
+  //   public_id: req.file.filename,
+  // };// ✅ SINGLE IMAGE
+  //   }
+
+  //   if (req.files && req.files.length > 0) {
+  //     postData.images = req.files.map((f) => f.path);
+
+  //     console.log("FILE:", req.file);
+
+  //     // 🔥 IMPORTANT: also set image for backward compatibility
+  //     if (!postData.image) {
+  //       postData.image = postData.images[0];
+  //     }
+  //   }
+
+  if (req.file) {
+  postData.image = {
+    url: req.file.path,
+    public_id: req.file.filename,
+  };
 }
 
-if (req.files?.length) {
-  postData.images = req.files.map(f => f.filename); // ✅ MULTI
-}
+if (req.files && req.files.length > 0) {
+  postData.images = req.files.map((f) => ({
+    url: f.path,
+    public_id: f.filename,
+  }));
 
+  // backward compatibility
+  if (!postData.image) {
+    postData.image = postData.images[0];
+  }
+}
 
     // ✅ THIS WAS MISSING / BUG SOURCE
     if (isTemporary) {
-      postData.expiresAt = new Date(
-        Date.now() + 24 * 60 * 60 * 1000
-      );
+      postData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     } else {
       postData.expiresAt = null;
     }
 
     const post = await Post.create(postData);
+
+    // 🔥 HASHTAG COUNTER (SAFE ADD)
+    if (finalTags.length > 0) {
+      for (const tag of finalTags) {
+        await Hashtag.findOneAndUpdate(
+          { name: tag },
+          { $inc: { count: 1 } },
+          { upsert: true, new: true },
+        );
+      }
+    }
+
     // 🔥 POPULATE USER (THIS FIXES EVERYTHING)
-const populatedPost = await Post.findById(post._id).populate(
-  "user",
-  "name profileImage"
-);
-    res.status(201).json(post);
+    const populatedPost = await Post.findById(post._id).populate(
+      "user",
+      "name profileImage",
+    );
+
+    res.status(201).json(populatedPost);
   } catch (err) {
     console.error("Create post error:", err);
     res.status(500).json({ message: "Post failed" });
@@ -52,44 +114,66 @@ const populatedPost = await Post.findById(post._id).populate(
 };
 
 exports.getFeed = async (req, res) => {
+  console.log("🟢 /posts/feed called by", req.user.id);
+
   try {
-    const currentUserId = req.user.id;
+    const moodFilter = req.query.mood; // ✅ ADD
 
-    const posts = await Post.find({
-      $or: [
-        { expiresAt: null },
-        { expiresAt: { $gt: new Date() } },
-      ],
-    })
-      .populate("user", "name profileImage followers") // 👈 followers added
+    const query = {
+      user: { $ne: req.user.id }, // 🔥 AUTHOR EXCLUDED
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+    };
+
+    if (moodFilter) {
+      query.mood = moodFilter; // ✅ OPTIONAL
+    }
+
+    const posts = await Post.find(query)
+      .populate("user", "name profileImage")
       .populate("comments.user", "name profileImage")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    // 🔥 ADD FOLLOW STATUS HERE
+    setCache("feed", posts, 15000);
+
+    const currentUser = await User.findById(req.user.id)
+      .select("following")
+      .lean();
+
+    const followingIds =
+      currentUser?.following?.map((id) => id.toString()) || [];
+
     const formattedPosts = posts.map((post) => {
-      const isFollowing = post.user.followers?.some(
-        (id) => id.toString() === currentUserId
-      );
+      if (post.isAnonymous) {
+        return {
+          ...post,
+          user: {
+            _id: null,
+            name: "Anonymous",
+            profileImage: null,
+            isFollowing: false,
+          },
+        };
+      }
 
       return {
-        ...post._doc,
+        ...post,
         user: {
-          ...post.user._doc,
-          isFollowing, // ✅ frontend-friendly flag
+          ...post.user,
+          isFollowing: followingIds.includes(post.user?._id?.toString()),
         },
       };
     });
 
     res.json(formattedPosts);
   } catch (err) {
-    console.error("Feed error:", err);
-    res.status(500).json(err);
+    console.error("🔥 FEED CRASH:", err);
+    res.status(500).json({
+      message: "Feed crashed",
+      error: err.message,
+    });
   }
 };
-
-
-
-
 
 exports.likePost = async (req, res) => {
   const post = await Post.findById(req.params.id);
@@ -121,7 +205,6 @@ exports.addComment = async (req, res) => {
   }
 };
 
-
 exports.getAllPosts = async (req, res) => {
   try {
     const posts = await Post.find()
@@ -135,7 +218,6 @@ exports.getAllPosts = async (req, res) => {
   }
 };
 
-
 exports.deletePost = async (req, res) => {
   const post = await Post.findById(req.params.id);
 
@@ -147,41 +229,91 @@ exports.deletePost = async (req, res) => {
     return res.status(403).json({ message: "Unauthorized" });
   }
 
+  if (post.image?.public_id) {
+  await cloudinary.uploader.destroy(post.image.public_id);
+}
+// 🔥 delete multiple images (future proof)
+  if (Array.isArray(post.images)) {
+    for (const img of post.images) {
+      if (img?.public_id) {
+        await cloudinary.uploader.destroy(img.public_id);
+      }
+    }
+  }
+
   await post.deleteOne();
   res.json({ message: "Post deleted" });
 };
 
-
 exports.toggleLike = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: "Post not found" });
-
+    const postId = req.params.id;
     const userId = req.user.id;
 
-    const index = post.likes.indexOf(userId);
-    if (index === -1) {
-      post.likes.push(userId); // 👍 like
-    } else {
-      post.likes.splice(index, 1); // 👎 unlike
+    // 🔹 1. RAW POST (NO POPULATE)
+    const post = await Post.findById(postId).lean();
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
     }
 
-    await post.save();
-    res.json({ likes: post.likes.length });
+    const alreadyLiked = post.likes.some((id) => id.toString() === userId);
+
+    let updateQuery;
+
+    if (alreadyLiked) {
+      updateQuery = { $pull: { likes: userId } };
+    } else {
+      updateQuery = { $addToSet: { likes: userId } };
+
+      // 🔥 preserve anonymous logic
+      if (post.isAnonymous && post.user) {
+        await User.findByIdAndUpdate(post.user, {
+          $inc: { anonymousScore: 1 },
+        });
+      }
+    }
+
+    // 🔹 2. ATOMIC UPDATE (NO save())
+    const updatedPost = await Post.findByIdAndUpdate(postId, updateQuery, {
+      new: true,
+    })
+      .populate("user", "name profileImage")
+      .populate("comments.user", "name profileImage");
+
+    // 🔴 SOCKET LIVE LIKE EVENT
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("post:like:update", {
+        postId: updatedPost._id.toString(),
+        likes: updatedPost.likes,
+      });
+    }
+
+    res.json({
+      ...updatedPost.toObject(),
+      isLiked: !alreadyLiked,
+      likesCount: updatedPost.likes.length,
+    });
   } catch (err) {
+    console.error("Like error:", err);
     res.status(500).json({ message: "Like failed" });
   }
 };
-
 
 exports.toggleSave = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // ❌ 24h post cannot be saved
     if (post.isTemporary) {
-      return res.status(400).json({ message: "Temporary post cannot be saved" });
+      return res
+        .status(400)
+        .json({ message: "Temporary post cannot be saved" });
+    }
+
+    // 🔥 SAFE DEFAULT
+    if (!Array.isArray(post.savedBy)) {
+      post.savedBy = [];
     }
 
     const userId = req.user.id;
@@ -194,12 +326,21 @@ exports.toggleSave = async (req, res) => {
     }
 
     await post.save();
-    res.json({ saved: post.savedBy.includes(userId) });
+
+    res.json({
+      saved: post.savedBy.includes(userId),
+    });
+    const io = req.app.get("io");
+    if (io && index !== -1) {
+      io.emit("post:unsave:update", {
+        postId: post._id.toString(),
+      });
+    }
   } catch (err) {
+    console.error("Save error:", err);
     res.status(500).json({ message: "Save failed" });
   }
 };
-
 
 exports.getSavedPosts = async (req, res) => {
   try {
@@ -215,7 +356,6 @@ exports.getSavedPosts = async (req, res) => {
     res.status(500).json({ message: "Failed to load saved posts" });
   }
 };
-
 
 /* ================= 🔥 DELETE COMMENT (NEW) ================= */
 exports.deleteComment = async (req, res) => {
@@ -247,7 +387,6 @@ exports.deleteComment = async (req, res) => {
   }
 };
 
-
 // controllers/post.controller.js
 
 exports.getSinglePost = async (req, res) => {
@@ -259,9 +398,33 @@ exports.getSinglePost = async (req, res) => {
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
+    if (post.isAnonymous) {
+      post.user = {
+        _id: null,
+        name: "Anonymous",
+        profileImage: null,
+      };
+    }
 
     res.json(post);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+};
+
+exports.searchHashtags = async (req, res) => {
+  const q = req.query.q || "";
+  const tags = await Hashtag.find({
+    name: { $regex: q, $options: "i" },
+  })
+    .sort({ count: -1 })
+    .limit(20);
+
+  res.json(tags);
+};
+
+exports.trendingHashtags = async (req, res) => {
+  const tags = await Hashtag.find().sort({ count: -1 }).limit(10);
+
+  res.json(tags);
 };
