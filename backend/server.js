@@ -14,8 +14,15 @@ const cleanupExpiredPosts = require("./utils/cleanupExpiredPosts");
 const searchRoutes = require("./routes/search.routes");
 const hashtagRoutes = require("./routes/hashtag.routes");
 
-// ✅ CREATE APP FIRST
 const app = express();
+
+
+// ✅ CREATE APP FIRST
+app.use(cors({
+  origin: "*", // For now allow all (later restrict)
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 
 // ✅ MIDDLEWARE
 app.use(cors());
@@ -26,8 +33,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/chat", chatRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/admin", require("./routes/admin.routes"));
+// app.use("/api/admin", adminRoutes);
+// app.use("/api/admin", require("./routes/admin.routes"));
 app.use("/api/search", searchRoutes);
 app.use("/api/hashtags", require("./routes/hashtag.routes"));
 
@@ -42,7 +49,9 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*",
+    methods: ["GET", "POST"]
   },
+  transports: ["websocket", "polling"]
 });
 
 app.set("io",io);
@@ -64,15 +73,36 @@ io.on("connection", (socket) => {
 });
 
 // ✅ CONNECT MONGODB & START SERVER
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB Connected");
+// mongoose
+//   .connect(process.env.MONGO_URI)
+//   .then(() => {
+//     console.log("MongoDB Connected");
 
-    // ✅ IMPORTANT: USE server.listen NOT app.listen
-    server.listen(5000, "0.0.0.0", () => {
-      console.log("Server running on port 5000 WITH SOCKET.IO");
-    });
-    setInterval(cleanupExpiredPosts, 60 * 60 * 1000); // every 1 hour
-  })
-  .catch((err) => console.log("MongoDB Error:", err));
+//     // ✅ IMPORTANT: USE server.listen NOT app.listen
+//     server.listen(5000, "0.0.0.0", () => {
+//       console.log("Server running on port 5000 WITH SOCKET.IO");
+//     });
+//     setInterval(cleanupExpiredPosts, 60 * 60 * 1000); // every 1 hour
+//   })
+//   .catch((err) => console.log("MongoDB Error:", err));
+
+
+
+/* ================= DB + START ================= */
+
+const PORT = process.env.PORT || 5000;
+
+mongoose.connect(process.env.MONGO_URI)
+.then(()=>{
+  console.log("MongoDB Connected");
+
+  server.listen(PORT,"0.0.0.0",()=>{
+    console.log(`Server running on port ${PORT}`);
+  });
+
+  setInterval(cleanupExpiredPosts, 60*60*1000);
+
+})
+.catch(err=>{
+  console.log("MongoDB Error:", err);
+});
