@@ -5,6 +5,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
 import CrashBoundary from "./components/CrashBoundary";
 import useSocketLifecycle from "./hooks/useSocketLifecycle";
+import SafeScreen from "./components/SafeScreen";
+
 
 
 export default function App() {
@@ -20,7 +22,9 @@ export default function App() {
       />
 
       <PaperProvider>
+        <SafeScreen>
         <StackNavigator />
+        </SafeScreen>
       </PaperProvider>
     </SafeAreaProvider>
     </CrashBoundary>
