@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "VYBE.C",
+    "slug": "vybe-c",
+    "version": "1.0.0",
+     "jsEngine": "hermes",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.vybe.c",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-video",
+      "expo-audio"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bfb4320d-c674-4d35-9c7f-fa2c092ceb5b"
+      }
+    },
+    "owner": "rahulsingh005"
+  }
+}
