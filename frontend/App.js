@@ -5,7 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
 import CrashBoundary from "./components/CrashBoundary";
 import useSocketLifecycle from "./hooks/useSocketLifecycle";
-import SafeScreen from "./components/SafeScreen";
+import UniversalScreen from "./components/UniversalScreen";
 
 
 
@@ -18,13 +18,13 @@ export default function App() {
       <StatusBar
         barStyle="dark-content"
         backgroundColor="#ffffff"
-        translucent={false}
+        translucent={true}
       />
 
       <PaperProvider>
-        <SafeScreen>
+        <UniversalScreen>
         <StackNavigator />
-        </SafeScreen>
+        </UniversalScreen>
       </PaperProvider>
     </SafeAreaProvider>
     </CrashBoundary>

@@ -10,7 +10,7 @@ import {
   Modal,
 } from "react-native";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+
 import { Ionicons } from "@expo/vector-icons";
 import API from "../services/api";
 import {
@@ -567,7 +567,8 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+    
       <View style={styles.topHeader}>
         {/* LEFT PLACEHOLDER (keeps center aligned) */}
         <View style={{ width: 28 }} />
@@ -640,7 +641,7 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

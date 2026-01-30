@@ -8,7 +8,6 @@ import {
   Modal,
   Pressable,
   Alert,
-  SafeAreaView,
 } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,7 +17,7 @@ import CommentScreen from "./CommentScreen";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getSocket } from "../services/socket";
 import SafeImage from "@/components/SafeImage";
-import { log, error } from "../services/logger";
+import {  error } from "../services/logger";
 
 
 const socket = getSocket();
@@ -143,7 +142,7 @@ export default function PostView({ route, navigation }) {
       : post?.user?.profileImage?.url || "https://i.pravatar.cc/150";
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <Animated.View
         style={[
           styles.container,
@@ -376,7 +375,7 @@ export default function PostView({ route, navigation }) {
           </View>
         </Modal>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 }
 

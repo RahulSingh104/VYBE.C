@@ -13,7 +13,7 @@ import API from "../services/api";
 import { useRoute } from "@react-navigation/native";
 import { getSocket } from "../services/socket";
 import SafeImage from "../components/SafeImage";
-import { log, error } from "../services/logger";
+import {  error } from "../services/logger";
 
 const socket = getSocket();
 

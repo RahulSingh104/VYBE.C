@@ -8,9 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
-  KeyboardAvoidingView,
   ScrollView,
-  Platform,
 } from "react-native";
 import { useState, useCallback } from "react";
 import * as ImagePicker from "expo-image-picker";
@@ -161,10 +159,7 @@ const createdPost = res.data; // ✅ NOW res EXISTS
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+   
       <ScrollView
         contentContainerStyle={{ paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
@@ -316,7 +311,6 @@ const createdPost = res.data; // ✅ NOW res EXISTS
           )}
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
   );
 }
 
